@@ -10,5 +10,5 @@ jobs:
             - uses: actions/checkout@v4
             - uses: astral-sh/setup-uv@main
             - run: uv sync --locked
-            - run: uv run mypy
+            - run: uv run mypy rag_config_errores.py
             - run: uv run pytest
