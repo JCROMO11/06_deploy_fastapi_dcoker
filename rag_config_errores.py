@@ -19,17 +19,17 @@ class Chunk(TypedDict):
     text: str
 
 class Settings(BaseSettings):
-    api_key: str
-    model_name: str
-    base_url: str
-    k_points: int
+    api_key: str = ""
+    model_name: str = "deepseek-v4-flash"
+    base_url: str = "https://api.deepseek.com"
+    k_points: int = 5
     
     model_config = SettingsConfigDict(
         env_file='.env',
         env_file_encoding='utf-8'
     )
 
-settings = Settings()  # type: ignore[call-arg]
+settings = Settings()
 
 # 2.1 — Conecta responder() del RAG; carga el índice UNA vez al arrancar (lifespan)
 
