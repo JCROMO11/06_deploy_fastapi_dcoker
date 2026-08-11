@@ -12,3 +12,7 @@ jobs:
             - run: uv sync --locked
             - run: uv run mypy rag_config_errores.py
             - run: uv run pytest
+            - uses: docker/build-push-action@v5
+              with:
+                context: .
+                push: false

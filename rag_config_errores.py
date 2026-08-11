@@ -11,6 +11,12 @@ from qdrant_client import QdrantClient
 from fastembed import TextEmbedding
 from openai import OpenAI, APIError
 from contextlib import asynccontextmanager
+from typing import TypedDict
+
+class Chunk(TypedDict):
+    chunk_id: int
+    title: str
+    text: str
 
 class Settings(BaseSettings):
     api_key: str
@@ -23,11 +29,11 @@ class Settings(BaseSettings):
         env_file_encoding='utf-8'
     )
 
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]
 
 # 2.1 — Conecta responder() del RAG; carga el índice UNA vez al arrancar (lifespan)
 
-corpus = [
+corpus: list[Chunk] = [
   {
     "chunk_id": 1,
     "title": "Supervised Learning Basics",
@@ -180,7 +186,7 @@ def crear_qdrant_client(
  
     return db_qdrant
  
- 
+
 def crear_model_embedding() -> TextEmbedding:
     return TextEmbedding(
         model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
@@ -192,7 +198,7 @@ def vectorize_points(
 ) -> list[PointStruct]:
     vectores = list(model.embed(texts))
     return [
-        PointStruct(id=idx, vector=v, payload={"title": title, "text": text})
+        PointStruct(id=idx, vector=v.tolist(), payload={"title": title, "text": text})
         for idx, (v, title, text) in enumerate(zip(vectores, titles, texts))
     ]
  
@@ -212,7 +218,11 @@ def prompt_making(query: str, query_vector, db_qdrant: QdrantClient) -> str:
         limit=settings.k_points,
     ).points
  
-    id_contexto = "\n".join(f"[{doc.id}] {doc.payload['text']}" for doc in top_chunks)
+    id_contexto = "\n".join(
+        f"[{doc.id}] {doc.payload['text']}"
+        for doc in top_chunks
+        if doc.payload is not None
+    )
  
     return f"""
 Instrucciones: Responde con un 'No sé' sino tienes suficiente contexto para poder responder las preguntas.
@@ -255,7 +265,10 @@ def ai_response(prompt: str, cliente_ia: OpenAI) -> str:
         model=settings.model_name,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    if content is None:
+        raise LLMError("El LLM devolvió una respuesta vacía.")
+    return content
  
  
 def responder(pregunta: str, model: TextEmbedding, db_qdrant: QdrantClient, ai_client: OpenAI) -> str:
@@ -274,8 +287,11 @@ def ai_response_try_except(prompt: str, cliente_ia: OpenAI) -> str:
             model=settings.model_name,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.choices[0].message.content
- 
+        content = response.choices[0].message.content
+        if content is None:
+            raise LLMError("El LLM devolvió una respuesta vacía.")
+        return content
+
     except APIError as e:
         raise LLMError(
             f"Error en la API, no es posible conectarse a {settings.base_url}"
